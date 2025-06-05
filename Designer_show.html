@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Fashion Show Judgement</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    background-image: url('OIP.jfif');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    min-height: 100vh;
+    color: white;
+  }
+
+  .overlay-box {
+    background-color: rgba(0, 0, 0, 0.6);
+    padding: 20px;
+    margin: 20px;
+    border-radius: 10px;
+  }
+
+  .hidden { display: none; }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    margin-bottom: 20px;
+    background-color: rgba(255, 255, 255, 0.9);
+    color: black;
+  }
+  th, td {
+    border: 1px solid #aaa;
+    padding: 8px;
+    text-align: center;
+  }
+  th { background-color: #f2f2f2; }
+  input[type=number] { width: 70px; }
+  button { padding: 8px 16px; margin: 5px 0; cursor: pointer; }
+</style>
+</head>
+<body>
+<!-- Login Page -->
+<div id="loginPage">
+  <h2>Judge Login</h2>
+  <form id="loginForm">
+    <label>Username: <input type="text" id="username" required /></label><br/><br/>
+    <label>Password: <input type="password" id="password" required /></label><br/><br/>
+    <button type="submit">Login</button>
+  </form>
+  <p>Login as one of the 3 judges or admin.</p>
+</div>
+
+<!-- Main Page after Login -->
+<div class="hidden" id="mainPage">
+  <h2>Welcome, <span id="loggedUser"></span></h2>
+  <button onclick="showDesignerForm()">Designer Show Judgment Form</button>
+  <button onclick="showResults()" id="adminResultsBtn" class="hidden">View All Results (Admin)</button>
+  <button onclick="logout()">Logout</button>
+</div>
+
+<!-- Designer Show Form -->
+<div class="hidden" id="designerForm">
+  <h2>Designer Show Judgment Form</h2>
+  <form id="designerFormEntries">
+    <div id="designerRows"></div>
+    <button type="submit">Submit Scores</button>
+  </form>
+  <button onclick="backToMain()">Back</button>
+</div>
+
+<!-- Results Page -->
+<div class="hidden" id="resultsPage">
+  <h2>All Submitted Scores</h2>
+  <div id="resultsContainer"></div>
+  <button onclick="exportToCSV()">Export to CSV</button>
+  <button onclick="backToMain()">Back</button>
+</div>
+
+<script>
+  // Predefined users
+  const users = {
+    judge1: "pass1",
+    judge2: "pass2",
+    judge3: "pass3",
+    admin: "adminpass"
+  };
+
+  const isAdmin = () => sessionStorage.getItem("loggedInUser") === "admin";
+
+  document.getElementById("loginForm").onsubmit = function(e) {
+    e.preventDefault();
+    const uname = document.getElementById("username").value.trim();
+    const pass = document.getElementById("password").value.trim();
+    if(users[uname] && users[uname] === pass){
+      sessionStorage.setItem("loggedInUser", uname);
+      loadMainPage();
+    } else {
+      alert("Invalid username or password.");
+    }
+  };
+
+  function loadMainPage(){
+    document.getElementById("loginPage").classList.add("hidden");
+    document.getElementById("designerForm").classList.add("hidden");
+    document.getElementById("resultsPage").classList.add("hidden");
+    document.getElementById("mainPage").classList.remove("hidden");
+
+    const uname = sessionStorage.getItem("loggedInUser");
+    document.getElementById("loggedUser").textContent = uname;
+    if(uname === "admin"){
+      document.getElementById("adminResultsBtn").classList.remove("hidden");
+    } else {
+      document.getElementById("adminResultsBtn").classList.add("hidden");
+    }
+  }
+
+  function logout(){
+    sessionStorage.removeItem("loggedInUser");
+    document.getElementById("loginForm").reset();
+    document.getElementById("loginPage").classList.remove("hidden");
+    document.getElementById("mainPage").classList.add("hidden");
+    document.getElementById("designerForm").classList.add("hidden");
+    document.getElementById("resultsPage").classList.add("hidden");
+  }
+
+  function backToMain(){
+    loadMainPage();
+  }
+
+  function showDesignerForm() {
+    document.getElementById("mainPage").classList.add("hidden");
+    document.getElementById("designerForm").classList.remove("hidden");
+
+    const container = document.getElementById("designerRows");
+    let tableHTML = `
+      <table>
+        <thead>
+          <tr>
+            <th>Company</th>
+            <th>Costume (0-10)</th>
+            <th>Choreo (0-10)</th>
+            <th>Presentation (0-10)</th>
+          </tr>
+        </thead>
+        <tbody>
+    `;
+    for(let i=1; i<=20; i++){
+      tableHTML += `
+        <tr>
+          <td>Company ${i}</td>
+          <td><input type="number" name="costume${i}" min="0" max="10"></td>
+          <td><input type="number" name="choreo${i}" min="0" max="10" ></td>
+          <td><input type="number" name="presentation${i}" min="0" max="10" ></td>
+        </tr>
+      `;
+    }
+    tableHTML += "</tbody></table>";
+    container.innerHTML = tableHTML;
+
+    // Attach submit event
+    document.getElementById("designerFormEntries").onsubmit = function (e) {
+      e.preventDefault();
+      const uname = sessionStorage.getItem("loggedInUser");
+      if (!uname) return alert("Session expired. Please log in again.");
+
+      const form = e.target;
+      let data = [];
+
+      for (let i = 1; i <= 20; i++) {
+        const company = `Company ${i}`;
+        const costume = form[`costume${i}`].value;
+        const choreo = form[`choreo${i}`].value;
+        const presentation = form[`presentation${i}`].value;
+
+        data.push({
+          judge: uname,
+          company,
+          costume,
+          choreo,
+          presentation
+        });
+      }
+
+      // Load existing data
+      let saved = JSON.parse(localStorage.getItem("designerScores") || "[]");
+
+      // Remove previous entries from this judge before adding new to avoid duplicates
+      saved = saved.filter(entry => entry.judge !== uname);
+
+      // Add new entries
+      saved.push(...data);
+      localStorage.setItem("designerScores", JSON.stringify(saved));
+
+      alert("All entries submitted successfully!");
+      logout();
+    };
+  }
+
+  function showResults() {
+    document.getElementById("mainPage").classList.add("hidden");
+    document.getElementById("resultsPage").classList.remove("hidden");
+
+    const container = document.getElementById("resultsContainer");
+    const results = JSON.parse(localStorage.getItem("designerScores") || "[]");
+
+    if (results.length === 0) {
+      container.innerHTML = "<p>No scores submitted yet.</p>";
+      return;
+    }
+
+    // Filter to keep only latest submission per judge & company
+    // Since we remove previous judge entries on submit, each judge-company pair should be unique
+    // But to be safe, let's keep latest occurrence anyway:
+
+    const latestSubmissionsMap = new Map();
+    results.forEach(entry => {
+      const key = `${entry.judge}|${entry.company}`;
+      latestSubmissionsMap.set(key, entry);
+    });
+
+    const filteredResults = Array.from(latestSubmissionsMap.values());
+
+    // Group filtered results by company
+    const grouped = {};
+    filteredResults.forEach(entry => {
+      const name = entry.company;
+      if (!grouped[name]) grouped[name] = [];
+      grouped[name].push(entry);
+    });
+
+    // Individual scores table
+    let html = `
+      <table>
+        <thead>
+          <tr>
+            <th>Company</th>
+            <th>Judge</th>
+            <th>Costume</th>
+            <th>Choreo</th>
+            <th>Presentation</th>
+          </tr>
+        </thead>
+        <tbody>
+    `;
+
+    const avgData = [];
+
+    for (const company in grouped) {
+      const entries = grouped[company];
+      entries.forEach(entry => {
+        html += `
+          <tr>
+            <td>${company}</td>
+            <td>${entry.judge}</td>
+            <td>${entry.costume}</td>
+            <td>${entry.choreo}</td>
+            <td>${entry.presentation}</td>
+          </tr>
+        `;
+      });
+
+      // Calculate averages
+      const total = entries.reduce((acc, curr) => {
+        return {
+          costume: acc.costume + parseFloat(curr.costume),
+          choreo: acc.choreo + parseFloat(curr.choreo),
+          presentation: acc.presentation + parseFloat(curr.presentation),
+        };
+      }, { costume: 0, choreo: 0, presentation: 0 });
+
+      const count = entries.length;
+      const avgCostume = total.costume / count;
+      const avgChoreo = total.choreo / count;
+      const avgPresentation = total.presentation / count;
+      const totalScore = avgCostume + avgChoreo + avgPresentation;
+
+      avgData.push({
+        company,
+        avgCostume: avgCostume.toFixed(2),
+        avgChoreo: avgChoreo.toFixed(2),
+        avgPresentation: avgPresentation.toFixed(2),
+        totalScore: totalScore.toFixed(2)
+      });
+    }
+
+    html += `</tbody></table>
+      <h3>Average and Total Scores</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Company</th>
+            <th>Avg Costume</th>
+            <th>Avg Choreo</th>
+            <th>Avg Presentation</th>
+            <th>Total Score</th>
+          </tr>
+        </thead>
+        <tbody>`;
+
+    avgData.forEach(avg => {
+      html += `
+        <tr>
+          <td>${avg.company}</td>
+          <td>${avg.avgCostume}</td>
+          <td>${avg.avgChoreo}</td>
+          <td>${avg.avgPresentation}</td>
+          <td>${avg.totalScore}</td>
+        </tr>
+      `;
+    });
+
+    html += `</tbody></table>`;
+    container.innerHTML = html;
+
+    // Store averages globally for CSV export
+    window.avgResultsForCSV = avgData;
+  }
+
+  function exportToCSV() {
+    const data = window.avgResultsForCSV || [];
+    if (data.length === 0) return alert("No data to export!");
+
+    const headers = ["Company", "Avg Costume", "Avg Choreo", "Avg Presentation", "Total Score"];
+    const rows = data.map(row => [row.company, row.avgCostume, row.avgChoreo, row.avgPresentation, row.totalScore]);
+
+    let csvContent = "data:text/csv;charset=utf-8," + headers.join(",") + "\n";
+    csvContent += rows.map(e => e.join(",")).join("\n");
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "fashion_show_results.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
+  // On page load, check if logged in already
+  window.onload = () => {
+    if(sessionStorage.getItem("loggedInUser")){
+      loadMainPage();
+    }
+  };
+</script>
+
+</body>
+</html>

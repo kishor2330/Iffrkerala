@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Fashion Show Judgement</title>
+  <style>
+    body { font-family: Arial; padding: 20px; }
+    .hidden { display: none; }
+    table, th, td { border: 1px solid #000; border-collapse: collapse; padding: 5px; text-align: center; }
+    input[type="number"] { width: 60px; }
+    button { margin: 5px; padding: 8px; }
+    th { background-color: #f2f2f2; }
+  </style>
+</head>
+<body>
+
+<!-- LOGIN PAGE -->
+<div id="loginPage">
+  <h2>Judge/Admin Login</h2>
+  <input id="username" placeholder="Username" required>
+  <input id="password" type="password" placeholder="Password" required>
+  <button onclick="login()">Login</button>
+</div>
+
+<!-- DASHBOARD -->
+<div id="dashboard" class="hidden">
+  <h2 id="welcomeMsg"></h2>
+  <button onclick="goToRound(1)">Kids Pageant Round 1</button>
+  <button onclick="goToRound(2)">Kids Pageant Round 2</button>
+  <button onclick="showResults()" id="adminOnly" class="hidden">View Final Results</button>
+  <button onclick="downloadCSV()" id="downloadBtn" class="hidden">Download CSV</button>
+  <button onclick="logout()">Logout</button>
+</div>
+
+<!-- JUDGEMENT PAGE -->
+<div id="judgementPage" class="hidden">
+  <h3 id="roundTitle">Judgement Form</h3>
+  <div id="formContainer"></div>
+  <button onclick="saveScores()">Submit</button>
+  <button onclick="backToDashboard()">Back</button>
+  <div id="markListContainer" style="margin-top: 30px;"></div>
+</div>
+
+<!-- RESULTS PAGE -->
+<div id="resultsPage" class="hidden">
+  <h3>Final Results</h3>
+  <div id="resultsTable"></div>
+  <button onclick="backToDashboard()">Back</button>
+</div>
+
+<script>
+  const users = { judge1: "1234", judge2: "1234", judge3: "1234", admin: "1234" };
+  let currentUser = "", currentRound = 1;
+
+  function login() {
+    const user = document.getElementById('username').value;
+    const pass = document.getElementById('password').value;
+    if (users[user] && users[user] === pass) {
+      sessionStorage.setItem("user", user);
+      location.reload();
+    } else {
+      alert("Invalid login");
+    }
+  }
+
+  function logout() {
+    sessionStorage.clear();
+    location.reload();
+  }
+
+  function goToRound(round) {
+    currentRound = round;
+    document.getElementById("dashboard").classList.add("hidden");
+    document.getElementById("judgementPage").classList.remove("hidden");
+    document.getElementById("roundTitle").innerText = `Judgement Form - Round ${round}`;
+    renderForm(round);
+  }
+
+  function renderForm(round) {
+    const container = document.getElementById("formContainer");
+    let table = `<h4>Round ${round}</h4><table><tr><th>Chest #</th><th>Attitude</th><th>Costume</th><th>Walk</th><th>Pose</th></tr>`;
+    for (let i = 1; i <= 25; i++) {
+      table += `<tr>
+        <td>${i}</td>
+        <td><input type="number" id="att_${round}_${i}"></td>
+        <td><input type="number" id="cost_${round}_${i}"></td>
+        <td><input type="number" id="walk_${round}_${i}"></td>
+        <td><input type="number" id="pose_${round}_${i}"></td>
+      </tr>`;
+    }
+    table += `</table>`;
+    container.innerHTML = table;
+    loadScores();
+    showMarkList(round);
+  }
+
+  function saveScores() {
+    const round = currentRound;
+    const user = currentUser;
+    const data = {};
+    for (let i = 1; i <= 25; i++) {
+      data[i] = {
+        attitude: Number(document.getElementById(`att_${round}_${i}`).value) || 0,
+        costume: Number(document.getElementById(`cost_${round}_${i}`).value) || 0,
+        walk: Number(document.getElementById(`walk_${round}_${i}`).value) || 0,
+        pose: Number(document.getElementById(`pose_${round}_${i}`).value) || 0
+      };
+    }
+    localStorage.setItem(`round${round}_${user}`, JSON.stringify(data));
+    alert("Scores saved!");
+    showMarkList(round);
+  }
+
+  function loadScores() {
+    const round = currentRound;
+    const user = currentUser;
+    const saved = JSON.parse(localStorage.getItem(`round${round}_${user}`) || "{}");
+    for (let i = 1; i <= 25; i++) {
+      if (saved[i]) {
+        document.getElementById(`att_${round}_${i}`).value = saved[i].attitude || "";
+        document.getElementById(`cost_${round}_${i}`).value = saved[i].costume || "";
+        document.getElementById(`walk_${round}_${i}`).value = saved[i].walk || "";
+        document.getElementById(`pose_${round}_${i}`).value = saved[i].pose || "";
+      }
+    }
+  }
+
+  function showMarkList(round) {
+    const user = currentUser;
+    const saved = JSON.parse(localStorage.getItem(`round${round}_${user}`) || "{}");
+    if (!saved || Object.keys(saved).length === 0) {
+      document.getElementById("markListContainer").innerHTML = "<p><i>No scores available yet.</i></p>";
+      return;
+    }
+
+    let markTable = `<h4>Entered Marks - Round ${round}</h4><table><tr><th>Chest #</th><th>Attitude</th><th>Costume</th><th>Walk</th><th>Pose</th><th>Total</th></tr>`;
+    for (let i = 1; i <= 25; i++) {
+      const s = saved[i];
+      if (s) {
+        const total = s.attitude + s.costume + s.walk + s.pose;
+        markTable += `<tr>
+          <td>${i}</td>
+          <td>${s.attitude}</td>
+          <td>${s.costume}</td>
+          <td>${s.walk}</td>
+          <td>${s.pose}</td>
+          <td>${total}</td>
+        </tr>`;
+      }
+    }
+    markTable += `</table>`;
+    document.getElementById("markListContainer").innerHTML = markTable;
+  }
+
+  function backToDashboard() {
+    document.getElementById("judgementPage").classList.add("hidden");
+    document.getElementById("resultsPage").classList.add("hidden");
+    document.getElementById("dashboard").classList.remove("hidden");
+  }
+
+  function showResults() {
+    document.getElementById("dashboard").classList.add("hidden");
+    document.getElementById("resultsPage").classList.remove("hidden");
+
+    const allScores = {};
+    for (let i = 1; i <= 25; i++) {
+      allScores[i] = { r1: [], r2: [] };
+    }
+
+    ["judge1", "judge2", "judge3"].forEach(judge => {
+      for (let r = 1; r <= 2; r++) {
+        const data = JSON.parse(localStorage.getItem(`round${r}_${judge}`) || "{}");
+        for (let i = 1; i <= 25; i++) {
+          if (data[i]) {
+            const sum = data[i].attitude + data[i].costume + data[i].walk + data[i].pose;
+            allScores[i][`r${r}`].push(sum);
+          }
+        }
+      }
+    });
+
+    let table = `<table><tr><th>Chest #</th><th>Round 1 Avg</th><th>Round 2 Avg</th><th>Total</th></tr>`;
+    for (let i = 1; i <= 25; i++) {
+      const r1avg = avg(allScores[i].r1);
+      const r2avg = avg(allScores[i].r2);
+      table += `<tr><td>${i}</td><td>${r1avg.toFixed(2)}</td><td>${r2avg.toFixed(2)}</td><td>${(r1avg + r2avg).toFixed(2)}</td></tr>`;
+    }
+    table += `</table>`;
+    document.getElementById("resultsTable").innerHTML = table;
+  }
+
+  function avg(arr) {
+    if (arr.length === 0) return 0;
+    return arr.reduce((a, b) => a + b, 0) / arr.length;
+  }
+
+  function downloadCSV() {
+    let csv = "Chest Number,Round 1 Avg,Round 2 Avg,Total\n";
+    for (let i = 1; i <= 25; i++) {
+      const r1 = [], r2 = [];
+      ["judge1", "judge2", "judge3"].forEach(j => {
+        const d1 = JSON.parse(localStorage.getItem(`round1_${j}`) || "{}")[i];
+        const d2 = JSON.parse(localStorage.getItem(`round2_${j}`) || "{}")[i];
+        if (d1) r1.push(d1.attitude + d1.costume + d1.walk + d1.pose);
+        if (d2) r2.push(d2.attitude + d2.costume + d2.walk + d2.pose);
+      });
+      const r1avg = avg(r1), r2avg = avg(r2);
+      csv += `${i},${r1avg.toFixed(2)},${r2avg.toFixed(2)},${(r1avg + r2avg).toFixed(2)}\n`;
+    }
+    const blob = new Blob([csv], { type: "text/csv" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = "final_results.csv";
+    link.click();
+  }
+
+  window.onload = () => {
+    const user = sessionStorage.getItem("user");
+    if (user && users[user]) {
+      currentUser = user;
+      document.getElementById("loginPage").classList.add("hidden");
+      document.getElementById("dashboard").classList.remove("hidden");
+      document.getElementById("welcomeMsg").innerText = "Welcome, " + user;
+      if (user === "admin") {
+        document.getElementById("adminOnly").classList.remove("hidden");
+        document.getElementById("downloadBtn").classList.remove("hidden");
+      }
+    }
+  };
+</script>
+
+</body>
+</html>
